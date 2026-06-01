@@ -154,6 +154,60 @@ class LaserParameterOptimizer:
             confidence=round(float(proba), 3),
         )
 
+    def sensitivity_analysis(
+        self,
+        request: OptimizeRequest,
+        baseline: OptimizeResult,
+        n_steps: int = 20,
+    ) -> pd.DataFrame:
+        """
+        Vary each parameter ±20% around the baseline and record how
+        predicted penetration and defect probability respond.
+
+        Returns a DataFrame with columns:
+            parameter, value, predicted_penetration_um, predicted_defect_prob
+        Useful for identifying which parameters have the most leverage.
+        """
+        if not self._trained:
+            raise RuntimeError("Call fit() before sensitivity_analysis().")
+
+        mat = MATERIALS[request.material_name]
+        base_vec = np.array([
+            baseline.power_w, baseline.pulse_ms, baseline.frequency_hz,
+            baseline.travel_speed_mm_s, baseline.spot_size_um,
+        ])
+        param_names = ["power_w", "pulse_ms", "frequency_hz", "travel_speed_mm_s", "spot_size_um"]
+        bounds = [
+            (mat.min_power_w, mat.max_power_w),
+            (0.5, 20.0),
+            (1.0, 50.0),
+            (0.5, 20.0),
+            (40.0, 600.0),
+        ]
+
+        rows = []
+        for i, (name, (lo, hi)) in enumerate(zip(param_names, bounds)):
+            sweep_lo = max(lo, base_vec[i] * 0.80)
+            sweep_hi = min(hi, base_vec[i] * 1.20)
+            for val in np.linspace(sweep_lo, sweep_hi, n_steps):
+                vec = base_vec.copy()
+                vec[i] = val
+                X = np.array([[
+                    vec[0], vec[1], vec[2], vec[3], vec[4],
+                    request.thickness_mm,
+                    mat.absorptivity, mat.thermal_cond, mat.melting_point_c,
+                ]])
+                pen  = float(self._pen_reg.predict(X)[0])
+                defp = float(np.clip(self._def_reg.predict(X)[0], 0, 1))
+                rows.append({
+                    "parameter": name,
+                    "value": round(val, 4),
+                    "predicted_penetration_um": round(pen, 2),
+                    "predicted_defect_prob": round(defp, 4),
+                })
+
+        return pd.DataFrame(rows)
+
     @property
     def classes_(self) -> list[str]:
         return list(self._le.classes_)
