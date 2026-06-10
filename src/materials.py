@@ -38,6 +38,15 @@ class Material:
     preferred_gas: str
     notes: str = ""
 
+    @property
+    def thermal_diffusivity(self) -> float:
+        """Thermal diffusivity α = k / (ρ·Cp) in m²/s.
+
+        Used in Rosenthal heat-flow models to estimate weld pool cooling rate
+        and HAZ width. Higher α → faster heat dissipation → smaller HAZ.
+        """
+        return self.thermal_cond / (self.density * self.specific_heat)
+
 
 MATERIALS: dict[str, Material] = {
     "Ti-6Al-4V": Material(
@@ -123,6 +132,38 @@ MATERIALS: dict[str, Material] = {
         max_power_w=600,
         preferred_gas="Argon",
         notes="Medical/scientific; high melting point — needs adequate pulse energy",
+    ),
+    "Nitinol (NiTi)": Material(
+        name="Nitinol (NiTi)",
+        absorptivity=0.40,
+        thermal_cond=8.6,
+        melting_point_c=1310,
+        density=6450,
+        specific_heat=490,
+        min_power_w=40,
+        max_power_w=600,
+        preferred_gas="Argon",
+        notes=(
+            "Shape memory alloy — medical stents, guidewires, surgical tools. "
+            "Low thermal conductivity concentrates heat; excessive energy destroys "
+            "shape memory properties. Tight process window required."
+        ),
+    ),
+    "Invar 36": Material(
+        name="Invar 36",
+        absorptivity=0.36,
+        thermal_cond=10.5,
+        melting_point_c=1425,
+        density=8050,
+        specific_heat=515,
+        min_power_w=60,
+        max_power_w=850,
+        preferred_gas="Argon",
+        notes=(
+            "Fe-36Ni low-expansion alloy — aerospace tooling, optical mounts, "
+            "cryogenic structures. Welding must preserve near-zero CTE; "
+            "avoid high heat input to prevent Fe₃Ni phase transformation."
+        ),
     ),
 }
 
